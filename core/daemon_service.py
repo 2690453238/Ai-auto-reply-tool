@@ -76,7 +76,8 @@ class DaemonService:
 
     def start(self, use_browser: bool = True) -> bool:
         """
-        启动守护进程
+        启动守护进程（非阻塞）
+        所有重操作（OCR/浏览器/LLM）在后台线程完成
 
         返回是否成功启动
         """
@@ -90,71 +91,89 @@ class DaemonService:
 
         self._log_activity("system", "守护进程启动中...")
 
-        # 初始化 OCR
-        if not OCREngine.is_ready():
-            self._log_activity("system", "正在加载 OCR 引擎...")
-            success = OCREngine.init_reader(
-                callback=lambda msg: self._log_activity("system", msg)
-            )
-            if not success:
-                self._log_activity("error", f"OCR 初始化失败: {OCREngine.get_error()}")
-                self.state = "stopped"
-                return False
-
-        # 检查 LLM
-        if not self.llm_client.is_available():
-            self._log_activity("warning", "LLM 服务不可用，将跳过自动回复")
-
-        # 加载所有启用的岗位
-        try:
-            agents = self.agent_manager.load_all_enabled()
-            if not agents:
-                self._log_activity("warning", "没有启用的岗位，请先在智能体配置中添加")
-            else:
-                self._log_activity("system", f"已加载 {len(agents)} 个岗位智能体")
-
-                # 为每个 agent 设置回调
-                for agent in agents.values():
-                    agent.on_reply_queued = self._on_agent_reply_queued
-                    agent.on_reply_sent = self._on_agent_reply_sent
-                    agent.on_error = lambda msg, a=agent: self._log_activity(
-                        "error", f"[{a.position_id}] {msg}"
-                    )
-        except Exception as e:
-            self._log_activity("error", f"加载岗位失败: {e}")
-
-        # 初始化浏览器（如果启用）
-        if self.use_browser:
-            try:
-                from automation.browser_controller import BrowserController
-                self.browser = BrowserController(headless=True)
-                if self.browser.start():
-                    self._log_activity("system", "浏览器已启动 (headless)")
-                    if not self.browser.login_saved_session():
-                        self._log_activity("warning",
-                            "浏览器未登录 BOSS 直聘，请先手动登录"
-                        )
-                else:
-                    self._log_activity("warning",
-                        "浏览器启动失败，将使用手动截图模式"
-                    )
-                    self.browser = None
-            except ImportError:
-                self._log_activity("warning",
-                    "未安装 selenium，使用手动截图模式"
-                )
-                self.browser = None
-
-        # 启动后台线程
-        self.state = "running"
-        self._thread = threading.Thread(target=self._run_loop, daemon=True)
+        # 立即启动后台线程，所有初始化在后台完成
+        self._thread = threading.Thread(target=self._init_and_run, daemon=True)
         self._thread.start()
 
-        self._log_activity("system", "守护进程已启动 ✓")
-        if self.on_status_change:
-            self.on_status_change(self.state)
-
         return True
+
+    def _init_and_run(self):
+        """在后台线程中完成初始化，然后进入主循环"""
+        try:
+            # === 初始化 OCR ===
+            self._log_activity("system", "正在加载 OCR 引擎...")
+            if OCREngine.is_ready():
+                self._log_activity("system", "OCR 引擎已就绪")
+            else:
+                success = OCREngine.init_reader(
+                    callback=lambda msg: self._log_activity("system", msg)
+                )
+                if not success:
+                    self._log_activity("error", f"OCR 初始化失败: {OCREngine.get_error()}")
+                    self._log_activity("warning", "OCR 不可用，后台监控将无法识别截图")
+                    # 不终止，让用户知道OCR挂了但其他功能可用
+                else:
+                    self._log_activity("system", "OCR 引擎加载完成 ✓")
+
+            # === 检查 LLM ===
+            self._log_activity("system", "检查 LLM 服务...")
+            if self.llm_client.is_available():
+                self._log_activity("system", f"LLM 服务可用: {self.llm_client.list_models()}")
+            else:
+                self._log_activity("warning", "LLM 服务不可用，将跳过自动回复")
+
+            # === 加载岗位 ===
+            try:
+                agents = self.agent_manager.load_all_enabled()
+                if not agents:
+                    self._log_activity("warning", "没有启用的岗位，请先在智能体配置中添加")
+                else:
+                    self._log_activity("system", f"已加载 {len(agents)} 个岗位智能体")
+                    for agent in agents.values():
+                        agent.on_reply_queued = self._on_agent_reply_queued
+                        agent.on_reply_sent = self._on_agent_reply_sent
+                        agent.on_error = lambda msg, a=agent: self._log_activity(
+                            "error", f"[{a.position_id}] {msg}"
+                        )
+            except Exception as e:
+                self._log_activity("error", f"加载岗位失败: {e}")
+
+            # === 初始化浏览器 ===
+            if self.use_browser:
+                try:
+                    from automation.browser_controller import BrowserController
+                    self.browser = BrowserController(headless=True)
+                    if self.browser.start():
+                        self._log_activity("system", "浏览器已启动 (headless)")
+                        if not self.browser.login_saved_session():
+                            self._log_activity("warning",
+                                "浏览器未登录 BOSS直聘，请先手动登录"
+                            )
+                    else:
+                        self._log_activity("warning",
+                            "浏览器启动失败，将使用手动截图模式"
+                        )
+                        self.browser = None
+                except ImportError:
+                    self._log_activity("warning",
+                        "未安装 selenium，使用手动截图模式"
+                    )
+                    self.browser = None
+
+            # === 初始化完成 ===
+            self.state = "running"
+            self._log_activity("system", "守护进程初始化完成 ✓")
+            if self.on_status_change:
+                self.on_status_change("running")
+
+            # === 进入主循环 ===
+            self._run_loop()
+
+        except Exception as e:
+            self._log_activity("error", f"初始化失败: {e}")
+            self.state = "stopped"
+            if self.on_status_change:
+                self.on_status_change("stopped")
 
     def stop(self):
         """停止守护进程"""

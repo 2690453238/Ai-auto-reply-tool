@@ -38,6 +38,7 @@ class OCREngine:
         获取模型存储目录
         - 打包后：PyInstaller _MEIPASS 中的 .EasyOCR/model
         - 开发环境：用户目录下的 .EasyOCR/model
+        - 回退：项目目录下的 easyocr_models
         """
         # 检查 PyInstaller 打包后的路径
         if getattr(sys, "frozen", False):
@@ -49,6 +50,26 @@ class OCREngine:
         default = os.path.join(os.path.expanduser("~"), ".EasyOCR", "model")
         if os.path.isdir(default) and os.listdir(default):
             return os.path.dirname(default)
+
+        # 回退1：项目本地 easyocr_models 目录
+        local_models = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "easyocr_models"
+        )
+        if os.path.isdir(local_models) and os.listdir(local_models):
+            return local_models
+
+        # 回退2：D盘 miniconda 环境
+        for env_path in [
+            r"D:\bishe\miniconda3\envs\bishe",
+            r"D:\bishe\miniconda3",
+        ]:
+            try:
+                candidate = os.path.join(env_path, ".EasyOCR", "model")
+                if os.path.isdir(candidate) and os.listdir(candidate):
+                    return os.path.dirname(candidate)
+            except Exception:
+                pass
 
         return None
 
@@ -86,12 +107,12 @@ class OCREngine:
                 if callback:
                     callback("加载检测模型中...")
 
-                # 构建 Reader，禁止自动下载
+                # 构建 Reader
                 reader_kwargs = {
                     "lang_list": OCR_LANGUAGES,
                     "gpu": OCR_GPU,
                     "verbose": False,
-                    "download_enabled": False,  # 关键：禁止网络下载，只用本地模型
+                    "download_enabled": (model_dir is None),  # 无本地模型时允许下载
                 }
                 if model_dir:
                     reader_kwargs["model_storage_directory"] = model_dir

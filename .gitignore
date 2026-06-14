@@ -25,6 +25,7 @@ env/
 # 模型（太大，通过ollama pull获取）
 ollama_models/
 *.gguf
+easyocr_models/
 
 # 临时文件
 *.log
