@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+*.spec
+
+# 旧版打包
+dist/
+dist_new/build/
+
+# 测试文件
+test_simulation.py
+
+# IDE
+.vscode/
+.idea/
+
+# 环境
+miniconda3/
+venv/
+env/
+
+# 模型（太大，通过ollama pull获取）
+ollama_models/
+*.gguf
+
+# 临时文件
+*.log
+*.tmp
+
+# 运行时记忆(含个人信息)
+data/memories/
+!data/memories/.gitkeep

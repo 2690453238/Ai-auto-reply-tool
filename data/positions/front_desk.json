@@ -1,0 +1,27 @@
+{
+  "position_id": "front_desk",
+  "position_name": "前台接待",
+  "company_name": "星辰科技有限公司",
+  "company_info": "专注于企业SaaS服务的科技公司，200人规模，成立于2018年，已获B轮融资",
+  "job_description": "负责公司前台接待、访客登记、电话接听转接、快递收发、会议室管理、日常行政事务处理",
+  "requirements": "大专及以上学历，普通话标准，熟练使用办公软件，有服务意识，形象气质佳，20-35岁",
+  "salary_range": "5000-8000元/月",
+  "location": "北京市朝阳区国贸CBD",
+  "benefits": "五险一金、双休、带薪年假、节日福利、年度体检、团队活动",
+  "working_hours": "朝九晚六，午休1.5小时，双休",
+  "strategy_id": "default",
+  "llm_model": "qwen2.5:3b",
+  "boss_zhipin_job_id": "",
+  "auto_reply": {
+    "enabled": true,
+    "night_mode_only": true,
+    "night_start_hour": 22,
+    "night_end_hour": 8,
+    "max_replies_per_candidate_per_day": 5,
+    "cooldown_minutes": 5
+  },
+  "monitoring": {
+    "enabled": true,
+    "check_interval_seconds": 300
+  }
+}
