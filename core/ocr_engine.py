@@ -126,8 +126,8 @@ class OCREngine:
 
             except Exception as e:
                 cls._init_error = str(e)
-                # 如果模型缺失，尝试启用下载重试
-                if "missing" in str(e).lower() or "not found" in str(e).lower():
+                # 任何加载失败都尝试启用下载重试
+                if True:
                     try:
                         if callback:
                             callback("Downloading models from network...")

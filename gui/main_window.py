@@ -1580,14 +1580,9 @@ class MainWindow:
                 self._resume_daemon()
             return
 
-        # 检查LLM
-        if not self.llm_client.is_available():
-            if not messagebox.askyesno("提示",
-                "LLM服务不可用，守护进程将无法生成回复。\n是否继续启动？"):
-                return
-
-        self.daemon.start(use_browser=False)  # 默认不使用浏览器，用截图模式
+        self.daemon.start(use_browser=False)
         self._set_status("守护进程已启动")
+        # LLM可用性检查已在daemon后台线程中异步完成
 
     def _stop_daemon(self):
         """停止守护进程"""
